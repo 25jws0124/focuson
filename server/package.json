@@ -1,0 +1,14 @@
+{
+  "name": "focuson-server",
+  "version": "1.0.0",
+  "description": "FocusOn 백엔드 — 정적 파일 서빙 + 배틀룸(Socket.io) + 학부모 리포트 발송(모의)",
+  "private": true,
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5"
+  }
+}

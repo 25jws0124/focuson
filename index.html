@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FocusOn — AI 실시간 집중도 측정 학습 도우미</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand"><span class="dot"></span>Focus<b>On</b></div>
+  <div class="badges">
+    <span class="badge"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="vertical-align:-1px;margin-right:4px"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>온디바이스 · 영상은 기기 밖으로 나가지 않습니다</span>
+    <span class="badge alt" id="engineBadge">엔진: 실제</span>
+  </div>
+</header>
+
+<main class="layout">
+
+  <!-- ───────────────────── 왼쪽: 카메라 ───────────────────── -->
+  <section class="card cam">
+    <h2 class="cardtitle">카메라</h2>
+    <div class="camwrap">
+      <video id="cam" playsinline muted autoplay></video>
+      <canvas id="overlay"></canvas>
+      <div class="camoverlay" id="camHint">카메라 권한을 허용해 주세요</div>
+      <div class="calibring" id="calibBox" hidden>
+        <div class="calibnum" id="calibNum">5</div>
+        <div class="calibtxt">화면을 편하게 정면으로 바라보세요</div>
+        <div class="calibbar"><i id="calibBar"></i></div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button id="btnCalib" class="btn">보정 시작</button>
+      <button id="btnStart" class="btn primary" disabled>측정 시작</button>
+      <button id="btnStop"  class="btn ghost"   disabled>종료</button>
+    </div>
+    <p class="status" id="status">대기 중 — 먼저 <b>보정</b>을 실행하세요.</p>
+  </section>
+
+  <!-- ───────────────────── 오른쪽: 계기판 ───────────────────── -->
+  <section class="card gauge">
+    <div class="ringwrap">
+      <svg viewBox="0 0 220 220" class="ring">
+        <circle class="ringtrack" cx="110" cy="110" r="94" />
+        <circle class="ringfill"  cx="110" cy="110" r="94" id="ringFill" />
+      </svg>
+      <div class="ringtext">
+        <div class="scorenum" id="scoreNum">--</div>
+        <div class="scorelabel">집중도</div>
+      </div>
+      <div class="confflash" id="confFlash">막힌 지점</div>
+    </div>
+
+    <div class="chip" id="stateChip" data-state="idle">대기</div>
+
+    <div class="signals">
+      <div class="sig">
+        <div class="siglabel"><span>머리 자세</span><em id="valHead">–</em></div>
+        <div class="bar"><i id="barHead"></i></div>
+      </div>
+      <div class="sig">
+        <div class="siglabel"><span>시선</span><em id="valGaze">–</em></div>
+        <div class="bar"><i id="barGaze"></i></div>
+      </div>
+      <div class="sig">
+        <div class="siglabel"><span>눈 뜸</span><em id="valEyes">–</em></div>
+        <div class="bar"><i id="barEyes"></i></div>
+      </div>
+      <p class="hint">막대가 가득 찰수록 <b>보정 기준선에 가깝다</b>는 뜻입니다.</p>
+    </div>
+
+    <div class="minibox">
+      <div class="minihead"><span>최근 60초</span><span id="miniMeta">–</span></div>
+      <canvas id="miniTimeline" height="90"></canvas>
+    </div>
+  </section>
+</main>
+
+<!-- ───────────────────── 리포트 ───────────────────── -->
+<section class="card report" id="report" hidden>
+  <h2 class="cardtitle">학습 리포트</h2>
+
+  <div class="kpis">
+    <div class="kpi"><div class="kpival" id="kpiRatio">–</div><div class="kpilab">실집중률</div></div>
+    <div class="kpi"><div class="kpival" id="kpiDur">–</div><div class="kpilab">학습 시간</div></div>
+    <div class="kpi"><div class="kpival" id="kpiAvg">–</div><div class="kpilab">평균 집중도</div></div>
+    <div class="kpi"><div class="kpival" id="kpiConf">–</div><div class="kpilab">막힌 지점</div></div>
+  </div>
+
+  <div class="chartbox">
+    <canvas id="reportChart" height="220"></canvas>
+    <div class="legend">
+      <span><i class="lg focused"></i>집중</span>
+      <span><i class="lg distracted"></i>딴짓</span>
+      <span><i class="lg drowsy"></i>졸음</span>
+      <span><i class="lg away"></i>자리 이탈</span>
+      <span><i class="lg conf"></i>막힌 지점</span>
+    </div>
+  </div>
+
+  <div class="lists">
+    <div>
+      <h3>흐트러진 구간</h3>
+      <ul id="segList" class="list"><li class="empty">없음 — 훌륭합니다!</li></ul>
+    </div>
+    <div>
+      <h3>막힌 지점 (다시 볼 곳)</h3>
+      <ul id="confList" class="list"><li class="empty">감지된 지점 없음</li></ul>
+    </div>
+  </div>
+
+  <div class="parentreport">
+    <input type="email" id="parentEmail" class="parentemailinput" placeholder="학부모 이메일 주소" />
+    <button class="btn" id="btnSendParentReport">학부모에게 발송</button>
+  </div>
+  <p class="status" id="parentReportStatus"></p>
+
+  <div class="reportactions">
+    <button class="btn ghost" id="btnJson">리포트 JSON 저장</button>
+    <button class="btn" id="btnAgain">다시 측정</button>
+  </div>
+</section>
+
+<!-- 막힌 지점 복습 (실제 데이터 기반) -->
+<section class="card confreview" id="confReview" hidden>
+  <h2 class="cardtitle">막힌 지점 복습</h2>
+  <p class="confreviewhint">이번 세션에서 눈썹 찌푸림 패턴이 감지된 지점입니다. 앞뒤 30초 내용을 다시 확인해보세요.</p>
+  <div class="confgrid" id="confGrid"></div>
+</section>
+
+<!-- ───────────────────── 배틀룸 ───────────────────── -->
+<section class="card battle" id="battle">
+  <h2 class="cardtitle">배틀룸</h2>
+
+  <div class="battleentry" id="battleEntry">
+    <p class="battlehint">친구와 방을 만들거나, 받은 코드로 참가해서 실시간으로 집중도를 겨뤄보세요.</p>
+    <div class="battleentryrow">
+      <button class="btn primary" id="btnBattleCreate">방 만들기</button>
+      <input type="text" id="battleCodeInput" class="battlecodeinput" placeholder="방 코드 입력" maxlength="4" />
+      <button class="btn" id="btnBattleJoin">참가하기</button>
+    </div>
+    <p class="status" id="battleEntryStatus"></p>
+  </div>
+
+  <div class="battleroom" id="battleRoom" hidden>
+    <div class="battlecode">방 코드 <b id="battleCodeDisplay">----</b></div>
+    <div class="battlewaiting" id="battleWaiting">상대방을 기다리는 중… 방 코드를 공유하세요</div>
+    <div class="battlevs" id="battleVs" hidden>
+      <div class="battleside">
+        <div class="battlesidelabel">나</div>
+        <div class="scorenum" id="battleMyScore">--</div>
+        <div class="chip" id="battleMyChip" data-state="idle">대기</div>
+      </div>
+      <div class="battleside">
+        <div class="battlesidelabel">상대방</div>
+        <div class="scorenum" id="battleOppScore">--</div>
+        <div class="chip" id="battleOppChip" data-state="idle">대기</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="foot">FocusOn · L.E.A.P 2026 · 모든 영상 분석은 브라우저 안에서만 수행됩니다.</footer>
+
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
