@@ -7,8 +7,10 @@
  * ===================================================================== */
 
 const path = require('path');
+const fs = require('fs');
 const express = require('express');
 const http = require('http');
+const https = require('https');
 const { Server } = require('socket.io');
 
 const app = express();
@@ -18,6 +20,24 @@ const io = new Server(server, {
 });
 
 const PORT = process.env.PORT || 3000;
+
+/* ------------------------------------------------------------- HTTPS
+ * 카메라 권한(getUserMedia)은 브라우저 보안 정책상 HTTPS 또는 localhost에서만 허용된다.
+ * 발표자 본인 화면은 http://localhost 로도 카메라가 되지만, 같은 Wi-Fi의 다른 기기가
+ * IP 주소(예: http://172.16.1.139:3000)로 접속하면 일반 HTTP라 카메라가 막힌다.
+ * server/certs 에 자체 서명 인증서가 있으면 별도 포트로 HTTPS도 같이 띄운다.
+ */
+const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
+const certPath = path.join(__dirname, 'certs', 'cert.pem');
+const keyPath = path.join(__dirname, 'certs', 'key.pem');
+let httpsServer = null;
+if (fs.existsSync(certPath) && fs.existsSync(keyPath)) {
+  httpsServer = https.createServer(
+    { key: fs.readFileSync(keyPath), cert: fs.readFileSync(certPath) },
+    app
+  );
+  io.attach(httpsServer);
+}
 
 /* ------------------------------------------------------- 정적 파일 */
 // 프로젝트 루트(index.html, css/, js/)를 그대로 서빙 → 서버 하나로 전체 앱 구동
@@ -102,3 +122,9 @@ io.on('connection', (socket) => {
 server.listen(PORT, () => {
   console.log('FocusOn 서버가 http://localhost:' + PORT + ' 에서 실행 중입니다');
 });
+
+if (httpsServer) {
+  httpsServer.listen(HTTPS_PORT, () => {
+    console.log('HTTPS(다른 기기용, 카메라 허용됨)가 https://<이 컴퓨터의 IP>:' + HTTPS_PORT + ' 에서 실행 중입니다');
+  });
+}
