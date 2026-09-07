@@ -1,0 +1,7 @@
+# Vercel에는 프론트엔드(index.html, css/, js/)만 올린다.
+# server/ 를 통째로 제외하는 이유:
+#   - server/certs/key.pem (자체 서명 인증서 개인키)가 웹으로 공개되는 것을 막는다.
+#   - server/package.json 때문에 Vercel이 Node 앱으로 오인해 빌드를 시도하는 것을 막는다.
+# 배틀룸/학부모 리포트는 백엔드가 필요하므로 정적 배포에서는 자동으로 숨겨진다.
+server/
+README.md
