@@ -1,3 +1,16 @@
+# 의존성 / 인증서
+node_modules/
 server/node_modules/
 server/certs/
+
+# 비밀키 — 이메일 서비스 연동 시 여기에 들어간다. 절대 커밋 금지.
+.env
+.env.*
+!.env.example
+
+# 배포 도구
+.vercel
+
+# OS
 .DS_Store
+Thumbs.db
