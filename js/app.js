@@ -6,90 +6,19 @@
  *   기본    → js/focus-engine.js (진짜 엔진)
  * ===================================================================== */
 
-import { THRESHOLDS } from './engine-contract.js';
+import { el } from './ui/dom.js';
+import { STATE_KO, C, withAlpha } from './ui/theme.js';
+import { UI, RING_LEN, applyUiText, fmtTime } from './ui/display.js';
+import { drawOverlay, drawMini, drawReportChart } from './ui/charts.js';
+import { renderReport } from './ui/report.js';
+import { reportScore } from './ui/battle.js';
 
 const USE_MOCK = new URLSearchParams(location.search).has('mock');
 const { FocusEngine } = USE_MOCK
   ? await import('./mock-engine.js')
   : await import('./focus-engine.js');
 
-/* ------------------------------------------------------------- 요소 */
-const $ = (id) => document.getElementById(id);
-const el = {
-  video: $('cam'), overlay: $('overlay'), camHint: $('camHint'),
-  calibBox: $('calibBox'), calibNum: $('calibNum'), calibBar: $('calibBar'),
-  btnCalib: $('btnCalib'), btnStart: $('btnStart'), btnStop: $('btnStop'),
-  status: $('status'), engineBadge: $('engineBadge'),
-  ringFill: $('ringFill'), scoreNum: $('scoreNum'), stateChip: $('stateChip'),
-  confFlash: $('confFlash'),
-  barHead: $('barHead'), barGaze: $('barGaze'), barEyes: $('barEyes'),
-  valHead: $('valHead'), valGaze: $('valGaze'), valEyes: $('valEyes'),
-  mini: $('miniTimeline'), miniMeta: $('miniMeta'),
-  report: $('report'), reportChart: $('reportChart'),
-  kpiRatio: $('kpiRatio'), kpiDur: $('kpiDur'), kpiAvg: $('kpiAvg'), kpiConf: $('kpiConf'),
-  segList: $('segList'), confList: $('confList'),
-  btnJson: $('btnJson'), btnAgain: $('btnAgain'),
-  confReview: $('confReview'), confGrid: $('confGrid'),
-  parentEmail: $('parentEmail'), btnSendParentReport: $('btnSendParentReport'),
-  parentReportStatus: $('parentReportStatus'),
-  battle: $('battle'), parentReportBox: $('parentReportBox'),
-  miniTitle: $('miniTitle'), confReviewHint: $('confReviewHint'),
-  battleEntry: $('battleEntry'), btnBattleCreate: $('btnBattleCreate'),
-  battleCodeInput: $('battleCodeInput'), btnBattleJoin: $('btnBattleJoin'),
-  battleEntryStatus: $('battleEntryStatus'),
-  battleRoom: $('battleRoom'), battleCodeDisplay: $('battleCodeDisplay'),
-  battleWaiting: $('battleWaiting'), battleVs: $('battleVs'),
-  battleMyScore: $('battleMyScore'), battleMyChip: $('battleMyChip'),
-  battleOppScore: $('battleOppScore'), battleOppChip: $('battleOppChip'),
-};
-
-const STATE_KO = { focused: '집중', distracted: '딴짓', drowsy: '졸음', away: '자리 이탈', idle: '대기' };
-
-/* ------------------------------------------------ 색: CSS 변수가 유일한 출처
- * 캔버스는 CSS를 쓸 수 없어 색 값을 직접 넣어야 한다. 그렇다고 여기에 hex를 적으면
- * style.css 의 :root 를 바꿔도 캔버스만 옛 색으로 남아 화면 절반만 바뀐다.
- * 그래서 :root 값을 한 번 읽어와 이 객체로만 쓴다. 색을 바꾸는 곳은 CSS 한 곳뿐. */
-const cssVar = (name, fallback = '#000000') =>
-  getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
-
-/** '#rrggbb' → 'rgba(r,g,b,a)'  — 캔버스에서 투명도를 줄 때 */
-function withAlpha(hex, alpha) {
-  const h = hex.replace('#', '');
-  const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h;
-  const n = parseInt(full, 16);
-  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
-}
-
-const C = {
-  teal:    cssVar('--accent-teal'),
-  ink:     cssVar('--ink'),
-  muted:   cssVar('--muted'),
-  success: cssVar('--success'),
-  warning: cssVar('--warning'),
-  error:   cssVar('--error'),
-};
-
-const STATE_COLOR = { focused: C.success, distracted: C.warning, drowsy: C.error, away: C.muted };
-/* ---------------------------------------------- 화면 수치의 유일한 출처
- * 여기 있는 값만 고치면 화면 문구와 계산이 함께 따라간다.
- * 예전엔 같은 숫자가 index.html 텍스트와 이 파일에 따로 박혀 있어서,
- * 한쪽만 고치면 화면이 거짓말을 하는 상태가 됐다. */
-const UI = {
-  calibSec: 5,           // 보정 시간(초)
-  recentWindowSec: 60,   // 미니 타임라인이 보여주는 구간
-  reviewSpanSec: 30,     // '막힌 지점 복습' 안내에 쓰는 앞뒤 구간
-  roomCodeLen: 4,        // 배틀룸 방 코드 자릿수 — server/server.js 의 makeRoomCode() 와 반드시 일치
-};
-
-// 링 둘레는 SVG의 r 속성에서 읽는다 (마크업이 유일한 출처, 숫자 중복 제거)
-const RING_LEN = 2 * Math.PI * Number(el.ringFill.getAttribute('r'));
-
-/* 화면 문구 주입 — HTML에는 숫자를 적지 않는다 */
-el.miniTitle.textContent = `최근 ${UI.recentWindowSec}초`;
-el.confReviewHint.textContent =
-  `이번 세션에서 눈썹 찌푸림 패턴이 감지된 지점입니다. 앞뒤 ${UI.reviewSpanSec}초 내용을 다시 확인해보세요.`;
-el.calibNum.textContent = String(UI.calibSec);
-el.battleCodeInput.maxLength = UI.roomCodeLen;
+applyUiText();
 
 if (USE_MOCK) {
   el.engineBadge.textContent = '엔진: MOCK (UI 개발용)';
@@ -103,98 +32,6 @@ const engine = new FocusEngine();
 let recent = [];          // 미니 타임라인용 최근 구간 버퍼 {t, score, state}
 let recentConf = [];      // 최근 confusion t
 let lastReport = null;
-
-/* --------------------------------------------------------- 배틀룸 */
-/* 배틀룸과 학부모 리포트 발송은 Node 백엔드(server/)가 있어야 동작한다.
- * 정적 배포(Vercel 등)에는 백엔드가 없으므로:
- *   1) socket.io 스크립트 자체가 안 떠도 앱이 죽지 않게 가드한다.
- *      (이전엔 io가 undefined면 모듈 최상단에서 예외 → 카메라·엔진까지 전원 중단됐다.)
- *   2) 서버단 기능 UI는 기본적으로 숨기고, 실제로 연결될 때만 노출한다.
- *      눌러도 아무 일도 안 일어나는 버튼을 보여주지 않기 위함. */
-const NOOP_SOCKET = { on() {}, emit() {} };
-// 재시도를 3회로 제한한다. 기본값은 무한 재시도라, 백엔드가 없는 정적 배포에서
-// /socket.io/ 404 요청을 세션 내내 5초마다 계속 보낸다(요청 수백 건 낭비 + 콘솔 오염).
-const socket = (typeof io === 'function')
-  ? io({ reconnectionAttempts: 3, timeout: 4000 })
-  : NOOP_SOCKET;
-let battleActive = false;
-
-// 기본값: 백엔드 없음으로 가정 → 숨김 (연결되면 아래에서 다시 켜짐)
-el.battle.hidden = true;
-el.parentReportBox.hidden = true;
-
-socket.on('connect', () => {
-  // 한 번이라도 붙었으면 진짜 백엔드가 있는 것 → 이후 끊김은 무한 재시도로 복구한다.
-  socket.io.reconnectionAttempts(Infinity);
-  el.battle.hidden = false;
-  el.parentReportBox.hidden = false;
-});
-
-socket.on('connect_error', (err) => {
-  // 연결 실패는 정상 시나리오(정적 배포)라 화면에는 안 띄우되, 원인은 콘솔에 남긴다.
-  console.info('[FocusOn] 백엔드 미연결 — 배틀룸/학부모 리포트 비활성화:', err?.message || err);
-});
-
-if (socket === NOOP_SOCKET) {
-  console.info('[FocusOn] socket.io 스크립트를 불러오지 못했습니다 — 측정 기능은 그대로 동작합니다.');
-}
-
-el.btnBattleCreate.addEventListener('click', () => {
-  el.battleEntryStatus.textContent = '';
-  socket.emit('battle:create');
-});
-
-el.btnBattleJoin.addEventListener('click', () => {
-  const code = (el.battleCodeInput.value || '').trim().toUpperCase();
-  if (!code) { el.battleEntryStatus.textContent = '방 코드를 입력하세요.'; return; }
-  el.battleEntryStatus.textContent = '';
-  socket.emit('battle:join', { code });
-});
-
-socket.on('battle:created', ({ code }) => {
-  battleActive = true;
-  enterBattleRoom(code);
-  el.battleWaiting.hidden = false;
-  el.battleVs.hidden = true;
-});
-
-socket.on('battle:joined', ({ code }) => {
-  battleActive = true;
-  enterBattleRoom(code);
-  // 참가자는 이미 상대방이 있는 방에 들어온 것이므로 바로 대결 화면 표시
-  el.battleWaiting.hidden = true;
-  el.battleVs.hidden = false;
-});
-
-socket.on('battle:opponent-joined', () => {
-  el.battleWaiting.hidden = true;
-  el.battleVs.hidden = false;
-});
-
-socket.on('battle:join-error', ({ reason }) => {
-  el.battleEntryStatus.textContent = reason || '참가에 실패했습니다.';
-});
-
-socket.on('battle:opponent-score', ({ score, state }) => {
-  el.battleOppScore.textContent = score;
-  el.battleOppChip.dataset.state = state;
-  el.battleOppChip.textContent = STATE_KO[state] || state;
-});
-
-socket.on('battle:opponent-left', () => {
-  el.battleVs.hidden = true;
-  el.battleWaiting.hidden = false;
-  el.battleWaiting.textContent = '상대방이 방을 나갔습니다. 다른 사람이 참가할 때까지 기다려주세요.';
-  el.battleOppScore.textContent = '--';
-  el.battleOppChip.dataset.state = 'idle';
-  el.battleOppChip.textContent = '대기';
-});
-
-function enterBattleRoom(code) {
-  el.battleCodeDisplay.textContent = code;
-  el.battleEntry.hidden = true;
-  el.battleRoom.hidden = false;
-}
 
 /* ---------------------------------------------------------- 카메라 */
 async function initCamera() {
@@ -253,14 +90,9 @@ engine.on('score', ({ score, state, signals, t }) => {
   while (recent.length && recent[0].t < cutoff) recent.shift();
   recentConf = recentConf.filter((c) => c >= cutoff);
   el.miniMeta.textContent = fmtTime(t);
-  drawMini();
-  // 배틀룸 활성화 시 내 점수를 상대에게 전송 + 내 쪽 UI 갱신
-  if (battleActive) {
-    socket.emit('battle:score', { score, state });
-    el.battleMyScore.textContent = score;
-    el.battleMyChip.dataset.state = state;
-    el.battleMyChip.textContent = STATE_KO[state] || state;
-  }
+  drawMini(recent, recentConf);
+  // 배틀룸이 켜져 있으면 점수를 상대에게 (꺼져 있으면 아무 일도 안 함)
+  reportScore(score, state);
 });
 
 engine.on('confusion', ({ t }) => {
@@ -358,186 +190,8 @@ el.btnJson.addEventListener('click', () => {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 });
 
-/* ------------------------------------------------------- 랜드마크 */
-function drawOverlay(landmarks) {
-  const c = el.overlay;
-  const w = c.clientWidth, h = c.clientHeight;
-  if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
-  const ctx = c.getContext('2d');
-  ctx.clearRect(0, 0, w, h);
-  if (!landmarks) return;
-  ctx.fillStyle = withAlpha(C.teal, 0.75);
-  for (let i = 0; i < landmarks.length; i += 4) {
-    const p = landmarks[i];
-    ctx.fillRect(p.x * w - 1, p.y * h - 1, 2, 2);
-  }
-}
-
-/* ------------------------------------------------------ 미니 차트 */
-function drawMini() {
-  const c = el.mini;
-  const w = c.clientWidth, h = 90;
-  if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
-  const ctx = c.getContext('2d');
-  ctx.clearRect(0, 0, w, h);
-  if (recent.length < 2) return;
-
-  const t0 = recent[0].t, t1 = Math.max(recent[recent.length - 1].t, t0 + 1);
-  const X = (t) => ((t - t0) / (t1 - t0)) * w;
-  const Y = (s) => h - 6 - (s / 100) * (h - 12);
-
-  // 기준선 (집중 임계선 — 엔진과 같은 값을 쓴다)
-  ctx.strokeStyle = withAlpha(C.ink, 0.12);
-  ctx.setLineDash([3, 4]); ctx.beginPath();
-  ctx.moveTo(0, Y(THRESHOLDS.focused)); ctx.lineTo(w, Y(THRESHOLDS.focused)); ctx.stroke(); ctx.setLineDash([]);
-
-  // 면적
-  const grad = ctx.createLinearGradient(0, 0, 0, h);
-  grad.addColorStop(0, withAlpha(C.teal, 0.28));
-  grad.addColorStop(1, withAlpha(C.teal, 0));
-  ctx.beginPath();
-  ctx.moveTo(X(recent[0].t), h);
-  for (const r of recent) ctx.lineTo(X(r.t), Y(r.score));
-  ctx.lineTo(X(recent[recent.length - 1].t), h);
-  ctx.closePath(); ctx.fillStyle = grad; ctx.fill();
-
-  // 선
-  ctx.beginPath();
-  recent.forEach((r, i) => (i ? ctx.lineTo(X(r.t), Y(r.score)) : ctx.moveTo(X(r.t), Y(r.score))));
-  ctx.strokeStyle = C.teal; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.stroke();
-
-  // 막힌 지점 마커
-  ctx.fillStyle = C.ink;
-  for (const t of recentConf) {
-    ctx.beginPath(); ctx.arc(X(t), 8, 3, 0, Math.PI * 2); ctx.fill();
-  }
-}
-
-/* --------------------------------------------------------- 리포트 */
-function fmtTime(ms) {
-  const s = Math.max(0, Math.round(ms / 1000));
-  return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
-}
-
-function renderReport(rep) {
-  el.kpiRatio.textContent = Math.round(rep.focusRatio * 100) + '%';
-  el.kpiDur.textContent = fmtTime(rep.durationSec * 1000);
-  el.kpiAvg.textContent = rep.avgScore ?? '–';
-  el.kpiConf.textContent = rep.events.length + '회';
-
-  // 구간 리스트
-  el.segList.innerHTML = '';
-  if (!rep.segments.length) {
-    el.segList.innerHTML = '<li class="empty">없음 — 훌륭합니다!</li>';
-  } else {
-    for (const s of rep.segments) {
-      const li = document.createElement('li');
-      li.innerHTML = `<span class="tag ${s.type}">${STATE_KO[s.type]}</span>
-        <span>${fmtTime(s.startT)} → ${fmtTime(s.endT)}</span>
-        <span style="margin-left:auto;color:var(--tx3)">${Math.round((s.endT - s.startT) / 1000)}초</span>`;
-      el.segList.appendChild(li);
-    }
-  }
-
-  // 막힌 지점 리스트
-  el.confList.innerHTML = '';
-  if (!rep.events.length) {
-    el.confList.innerHTML = '<li class="empty">감지된 지점 없음</li>';
-  } else {
-    for (const e of rep.events) {
-      const li = document.createElement('li');
-      li.innerHTML = `<span class="tag conf">막힘</span><span>${fmtTime(e.t)} 지점</span>
-        <span style="margin-left:auto;color:var(--tx3)">이 부분 다시 보기</span>`;
-      el.confList.appendChild(li);
-    }
-  }
-
-  el.report.hidden = false;
-  drawReportChart(rep);
-  renderConfusionReview(rep);
-  el.report.scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-
-function renderConfusionReview(rep) {
-  el.confGrid.innerHTML = '';
-  if (!rep.events.length) { el.confReview.hidden = true; return; }
-  el.confReview.hidden = false;
-  rep.events.forEach((e, i) => {
-    const card = document.createElement('div');
-    card.className = 'confcard';
-    card.innerHTML = `
-      <div class="confthumb">영상 미리보기 없음</div>
-      <div class="conftime">${fmtTime(e.t)}</div>
-      <div class="conflabel">막힌 지점 ${i + 1} · 이 시점 전후 ${UI.reviewSpanSec}초를 다시 확인해보세요</div>`;
-    el.confGrid.appendChild(card);
-  });
-}
-
-function drawReportChart(rep) {
-  const c = el.reportChart;
-  const w = c.clientWidth, h = 220;
-  if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
-  const ctx = c.getContext('2d');
-  ctx.clearRect(0, 0, w, h);
-  const tl = rep.timeline;
-  if (tl.length < 2) {
-    ctx.fillStyle = C.muted; ctx.font = '13px sans-serif'; ctx.textAlign = 'center';
-    ctx.fillText('데이터가 너무 짧습니다', w / 2, h / 2);
-    return;
-  }
-  const pad = { l: 34, r: 12, t: 14, b: 24 };
-  const t0 = tl[0].t, t1 = Math.max(tl[tl.length - 1].t, t0 + 1);
-  const X = (t) => pad.l + ((t - t0) / (t1 - t0)) * (w - pad.l - pad.r);
-  const Y = (s) => pad.t + (1 - s / 100) * (h - pad.t - pad.b);
-
-  // 흐트러진 구간 배경 밴드
-  for (const s of rep.segments) {
-    ctx.fillStyle = withAlpha(STATE_COLOR[s.type], 0.13);
-    ctx.fillRect(X(s.startT), pad.t, Math.max(2, X(s.endT) - X(s.startT)), h - pad.t - pad.b);
-  }
-
-  // 격자 + y축
-  ctx.strokeStyle = withAlpha(C.ink, 0.08); ctx.lineWidth = 1;
-  ctx.fillStyle = C.muted; ctx.font = '11px sans-serif'; ctx.textAlign = 'right';
-  for (const v of [0, 25, 50, 75, 100]) {
-    ctx.beginPath(); ctx.moveTo(pad.l, Y(v)); ctx.lineTo(w - pad.r, Y(v)); ctx.stroke();
-    ctx.fillText(String(v), pad.l - 6, Y(v) + 4);
-  }
-
-  // x축 라벨
-  ctx.textAlign = 'center';
-  for (let i = 0; i <= 4; i++) {
-    const t = t0 + ((t1 - t0) * i) / 4;
-    ctx.fillText(fmtTime(t), X(t), h - 7);
-  }
-
-  // 곡선
-  const grad = ctx.createLinearGradient(0, pad.t, 0, h - pad.b);
-  grad.addColorStop(0, withAlpha(C.teal, 0.28));
-  grad.addColorStop(1, withAlpha(C.teal, 0));
-  ctx.beginPath();
-  ctx.moveTo(X(tl[0].t), h - pad.b);
-  for (const p of tl) ctx.lineTo(X(p.t), Y(p.score));
-  ctx.lineTo(X(tl[tl.length - 1].t), h - pad.b);
-  ctx.closePath(); ctx.fillStyle = grad; ctx.fill();
-
-  ctx.beginPath();
-  tl.forEach((p, i) => (i ? ctx.lineTo(X(p.t), Y(p.score)) : ctx.moveTo(X(p.t), Y(p.score))));
-  ctx.strokeStyle = C.teal; ctx.lineWidth = 2.2; ctx.lineJoin = 'round'; ctx.stroke();
-
-  // 막힌 지점 마커
-  for (const e of rep.events) {
-    ctx.strokeStyle = withAlpha(C.ink, 0.35); ctx.lineWidth = 1;
-    ctx.setLineDash([2, 3]);
-    ctx.beginPath(); ctx.moveTo(X(e.t), pad.t); ctx.lineTo(X(e.t), h - pad.b); ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.fillStyle = C.ink;
-    ctx.beginPath(); ctx.arc(X(e.t), pad.t + 2, 4, 0, Math.PI * 2); ctx.fill();
-  }
-}
-
 window.addEventListener('resize', () => {
-  drawMini();
+  drawMini(recent, recentConf);
   if (lastReport) drawReportChart(lastReport);
 });
 

@@ -26,7 +26,9 @@ focuson/
 ├─ css/style.css       ← 디자인
 ├─ js/focus-engine.js  ← ★ AI 엔진 = 우리 API (캡처+엔진)
 ├─ js/mock-engine.js   ← 같은 계약의 가짜 엔진 (프론트 병렬화용)
+├─ js/engine-contract.js ← 엔진과 화면이 공유하는 값
 ├─ js/app.js           ← 프론트 (엔진을 '호출'만 함)
+├─ js/ui/              ← 화면 조각들 (dom · theme · display · charts · report · battle)
 ├─ server/             ← 로컬 전용 백엔드 (배틀룸 + 학부모 발송). 배포에서 제외됨
 │  ├─ server.js
 │  └─ scripts/gen-cert.js  ← 로컬 HTTPS 인증서 생성
