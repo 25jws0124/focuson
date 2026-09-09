@@ -4,4 +4,8 @@
 #   - server/package.json 때문에 Vercel이 Node 앱으로 오인해 빌드를 시도하는 것을 막는다.
 # 배틀룸/학부모 리포트는 백엔드가 필요하므로 정적 배포에서는 자동으로 숨겨진다.
 server/
+
+# 내부 문서. CLAUDE.md 에는 미해결 보안 항목이 적혀 있어
+# 공개 URL(/CLAUDE.md)로 노출되면 안 된다.
 README.md
+CLAUDE.md
