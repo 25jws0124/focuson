@@ -39,9 +39,22 @@ if (fs.existsSync(certPath) && fs.existsSync(keyPath)) {
   io.attach(httpsServer);
 }
 
-/* ------------------------------------------------------- 정적 파일 */
-// 프로젝트 루트(index.html, css/, js/)를 그대로 서빙 → 서버 하나로 전체 앱 구동
-app.use(express.static(path.join(__dirname, '..')));
+/* ------------------------------------------------------- 정적 파일
+ * 프로젝트 루트를 통째로 서빙하면 안 된다. 예전 코드
+ *   app.use(express.static(path.join(__dirname, '..')))
+ * 는 /server/certs/key.pem (인증서 개인키), /server/node_modules/**,
+ * /CLAUDE.md 까지 200으로 내줬다. 실제 응답을 확인한 사실이다.
+ *
+ * 그래서 프론트엔드에 필요한 것만 명시적으로 허용한다(허용 목록 방식).
+ * 새 정적 폴더가 생기면 여기에 한 줄을 더해야 한다 — 일부러 불편하게 둔다.
+ * 목록에 없는 경로는 전부 404. Vercel 배포본이 서빙하는 범위와 동일하다. */
+const ROOT = path.join(__dirname, '..');
+const STATIC_OPTS = { dotfiles: 'deny', index: false };
+
+app.use('/css', express.static(path.join(ROOT, 'css'), STATIC_OPTS));
+app.use('/js', express.static(path.join(ROOT, 'js'), STATIC_OPTS));
+app.get(['/', '/index.html'], (req, res) => res.sendFile(path.join(ROOT, 'index.html')));
+
 app.use(express.json());
 
 /* ------------------------------------------------- 학부모 리포트 발송 */
