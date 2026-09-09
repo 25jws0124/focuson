@@ -26,7 +26,7 @@
       <canvas id="overlay"></canvas>
       <div class="camoverlay" id="camHint">카메라 권한을 허용해 주세요</div>
       <div class="calibring" id="calibBox" hidden>
-        <div class="calibnum" id="calibNum">5</div>
+        <div class="calibnum" id="calibNum"></div>
         <div class="calibtxt">화면을 편하게 정면으로 바라보세요</div>
         <div class="calibbar"><i id="calibBar"></i></div>
       </div>
@@ -73,7 +73,7 @@
     </div>
 
     <div class="minibox">
-      <div class="minihead"><span>최근 60초</span><span id="miniMeta">–</span></div>
+      <div class="minihead"><span id="miniTitle"></span><span id="miniMeta">–</span></div>
       <canvas id="miniTimeline" height="90"></canvas>
     </div>
   </section>
@@ -127,7 +127,7 @@
 <!-- 막힌 지점 복습 (실제 데이터 기반) -->
 <section class="card confreview" id="confReview" hidden>
   <h2 class="cardtitle">막힌 지점 복습</h2>
-  <p class="confreviewhint">이번 세션에서 눈썹 찌푸림 패턴이 감지된 지점입니다. 앞뒤 30초 내용을 다시 확인해보세요.</p>
+  <p class="confreviewhint" id="confReviewHint"></p>
   <div class="confgrid" id="confGrid"></div>
 </section>
 
@@ -139,7 +139,7 @@
     <p class="battlehint">친구와 방을 만들거나, 받은 코드로 참가해서 실시간으로 집중도를 겨뤄보세요.</p>
     <div class="battleentryrow">
       <button class="btn primary" id="btnBattleCreate">방 만들기</button>
-      <input type="text" id="battleCodeInput" class="battlecodeinput" placeholder="방 코드 입력" maxlength="4" />
+      <input type="text" id="battleCodeInput" class="battlecodeinput" placeholder="방 코드 입력" />
       <button class="btn" id="btnBattleJoin">참가하기</button>
     </div>
     <p class="status" id="battleEntryStatus"></p>

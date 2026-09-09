@@ -31,6 +31,7 @@ const el = {
   parentEmail: $('parentEmail'), btnSendParentReport: $('btnSendParentReport'),
   parentReportStatus: $('parentReportStatus'),
   battle: $('battle'), parentReportBox: $('parentReportBox'),
+  miniTitle: $('miniTitle'), confReviewHint: $('confReviewHint'),
   battleEntry: $('battleEntry'), btnBattleCreate: $('btnBattleCreate'),
   battleCodeInput: $('battleCodeInput'), btnBattleJoin: $('btnBattleJoin'),
   battleEntryStatus: $('battleEntryStatus'),
@@ -42,7 +43,26 @@ const el = {
 
 const STATE_KO = { focused: '집중', distracted: '딴짓', drowsy: '졸음', away: '자리 이탈', idle: '대기' };
 const STATE_COLOR = { focused: '#5db872', distracted: '#d4a017', drowsy: '#c64545', away: '#6c6a64' };
-const RING_LEN = 2 * Math.PI * 94;
+/* ---------------------------------------------- 화면 수치의 유일한 출처
+ * 여기 있는 값만 고치면 화면 문구와 계산이 함께 따라간다.
+ * 예전엔 같은 숫자가 index.html 텍스트와 이 파일에 따로 박혀 있어서,
+ * 한쪽만 고치면 화면이 거짓말을 하는 상태가 됐다. */
+const UI = {
+  calibSec: 5,           // 보정 시간(초)
+  recentWindowSec: 60,   // 미니 타임라인이 보여주는 구간
+  reviewSpanSec: 30,     // '막힌 지점 복습' 안내에 쓰는 앞뒤 구간
+  roomCodeLen: 4,        // 배틀룸 방 코드 자릿수 — server/server.js 의 makeRoomCode() 와 반드시 일치
+};
+
+// 링 둘레는 SVG의 r 속성에서 읽는다 (마크업이 유일한 출처, 숫자 중복 제거)
+const RING_LEN = 2 * Math.PI * Number(el.ringFill.getAttribute('r'));
+
+/* 화면 문구 주입 — HTML에는 숫자를 적지 않는다 */
+el.miniTitle.textContent = `최근 ${UI.recentWindowSec}초`;
+el.confReviewHint.textContent =
+  `이번 세션에서 눈썹 찌푸림 패턴이 감지된 지점입니다. 앞뒤 ${UI.reviewSpanSec}초 내용을 다시 확인해보세요.`;
+el.calibNum.textContent = String(UI.calibSec);
+el.battleCodeInput.maxLength = UI.roomCodeLen;
 
 if (USE_MOCK) {
   el.engineBadge.textContent = '엔진: MOCK (UI 개발용)';
@@ -53,7 +73,7 @@ if (USE_MOCK) {
 
 /* ------------------------------------------------------------- 상태 */
 const engine = new FocusEngine();
-let recent = [];          // 미니 타임라인용 최근 60초 {t, score, state}
+let recent = [];          // 미니 타임라인용 최근 구간 버퍼 {t, score, state}
 let recentConf = [];      // 최근 confusion t
 let lastReport = null;
 
@@ -186,7 +206,7 @@ engine.on('status', ({ phase }) => {
 engine.on('calibration', ({ progress, done }) => {
   el.calibBox.hidden = done;
   el.calibBar.style.width = (progress * 100).toFixed(1) + '%';
-  el.calibNum.textContent = Math.max(0, Math.ceil(5 * (1 - progress)));
+  el.calibNum.textContent = Math.max(0, Math.ceil(UI.calibSec * (1 - progress)));
 });
 
 engine.on('score', ({ score, state, signals, t }) => {
@@ -202,7 +222,7 @@ engine.on('score', ({ score, state, signals, t }) => {
   setBar(el.barEyes, el.valEyes, signals.eyes);
   // 미니 타임라인
   recent.push({ t, score, state });
-  const cutoff = t - 60000;
+  const cutoff = t - UI.recentWindowSec * 1000;
   while (recent.length && recent[0].t < cutoff) recent.shift();
   recentConf = recentConf.filter((c) => c >= cutoff);
   el.miniMeta.textContent = fmtTime(t);
@@ -240,7 +260,7 @@ el.btnCalib.addEventListener('click', async () => {
     await engine.init();
     engine.attach(el.video);
     el.calibBox.hidden = false;
-    await engine.calibrate(5);
+    await engine.calibrate(UI.calibSec);
     el.btnStart.disabled = false;
     el.status.innerHTML = '보정 완료 ✓ — <b>측정 시작</b>을 누르세요.';
   } catch (e) {
@@ -421,7 +441,7 @@ function renderConfusionReview(rep) {
     card.innerHTML = `
       <div class="confthumb">영상 미리보기 없음</div>
       <div class="conftime">${fmtTime(e.t)}</div>
-      <div class="conflabel">막힌 지점 ${i + 1} · 이 시점 전후 30초를 다시 확인해보세요</div>`;
+      <div class="conflabel">막힌 지점 ${i + 1} · 이 시점 전후 ${UI.reviewSpanSec}초를 다시 확인해보세요</div>`;
     el.confGrid.appendChild(card);
   });
 }
