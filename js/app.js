@@ -6,6 +6,8 @@
  *   기본    → js/focus-engine.js (진짜 엔진)
  * ===================================================================== */
 
+import { THRESHOLDS } from './engine-contract.js';
+
 const USE_MOCK = new URLSearchParams(location.search).has('mock');
 const { FocusEngine } = USE_MOCK
   ? await import('./mock-engine.js')
@@ -359,10 +361,10 @@ function drawMini() {
   const X = (t) => ((t - t0) / (t1 - t0)) * w;
   const Y = (s) => h - 6 - (s / 100) * (h - 12);
 
-  // 기준선 (집중 임계선 66점)
+  // 기준선 (집중 임계선 — 엔진과 같은 값을 쓴다)
   ctx.strokeStyle = 'rgba(20,20,19,.12)';
   ctx.setLineDash([3, 4]); ctx.beginPath();
-  ctx.moveTo(0, Y(66)); ctx.lineTo(w, Y(66)); ctx.stroke(); ctx.setLineDash([]);
+  ctx.moveTo(0, Y(THRESHOLDS.focused)); ctx.lineTo(w, Y(THRESHOLDS.focused)); ctx.stroke(); ctx.setLineDash([]);
 
   // 면적
   const grad = ctx.createLinearGradient(0, 0, 0, h);

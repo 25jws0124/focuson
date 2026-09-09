@@ -11,6 +11,7 @@ import {
   FaceLandmarker,
   FilesetResolver,
 } from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs';
+import { THRESHOLDS } from './engine-contract.js';
 
 /* ---------------------------------------------------------------- utils */
 const clamp = (v, lo = 0, hi = 1) => (v < lo ? lo : v > hi ? hi : v);
@@ -73,8 +74,8 @@ export const DEFAULT_CONFIG = {
 
   // 상태 판정
   thresholds: {
-    focused: 66,        // 이 이상이면 집중 후보
-    distracted: 54,     // 이 미만이면 딴짓 후보
+    focused: THRESHOLDS.focused,        // 이 이상이면 집중 후보 (engine-contract.js)
+    distracted: THRESHOLDS.distracted,  // 이 미만이면 딴짓 후보 (engine-contract.js)
     eyeClosedOff: 0.62, // eyeOff 가 이 이상이면 "눈 감김"
     perclosWindowMs: 10000,
     perclosRatio: 0.35, // 최근 10초 중 35% 이상 감겨 있으면 졸음
