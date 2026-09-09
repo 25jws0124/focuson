@@ -15,8 +15,30 @@ const { Server } = require('socket.io');
 
 const app = express();
 const server = http.createServer(app);
+/* Socket.io CORS
+ * 이 서버는 프론트엔드를 직접 서빙하므로 정상 사용은 전부 같은 origin이고 CORS가 필요 없다.
+ * CORS가 필요한 경우는 개발 중 다른 포트(예: VS Code Live Server 5500)에서 붙을 때뿐이다.
+ * origin:'*' 는 아무 웹사이트나 배틀룸 소켓에 붙을 수 있다는 뜻이라 쓰지 않는다.
+ *
+ * 기본값: 로컬/사설망 주소만 허용.
+ * 배포 시: ALLOWED_ORIGINS 환경변수에 실제 도메인을 콤마로 나열한다.
+ *   ALLOWED_ORIGINS="https://focuson.example.com" npm start
+ */
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '')
+  .split(',')
+  .map((v) => v.trim())
+  .filter(Boolean);
+
+const LOCAL_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\]|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})(:\d+)?$/;
+
+function isAllowedOrigin(origin) {
+  if (!origin) return true;                                   // 같은 origin 요청 (Origin 헤더 없음)
+  if (ALLOWED_ORIGINS.length) return ALLOWED_ORIGINS.includes(origin);
+  return LOCAL_ORIGIN.test(origin);                           // 환경변수가 없으면 로컬 개발만
+}
+
 const io = new Server(server, {
-  cors: { origin: '*' }, // 로컬 개발 편의용. 실제 배포 시 origin 제한 권장.
+  cors: { origin: (origin, cb) => cb(null, isAllowedOrigin(origin)) },
 });
 
 const PORT = process.env.PORT || 3000;
