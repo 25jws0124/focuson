@@ -32,11 +32,23 @@ const certPath = path.join(__dirname, 'certs', 'cert.pem');
 const keyPath = path.join(__dirname, 'certs', 'key.pem');
 let httpsServer = null;
 if (fs.existsSync(certPath) && fs.existsSync(keyPath)) {
-  httpsServer = https.createServer(
-    { key: fs.readFileSync(keyPath), cert: fs.readFileSync(certPath) },
-    app
-  );
-  io.attach(httpsServer);
+  // 인증서가 깨져 있거나 절반만 생성됐으면 createServer 가 예외를 던진다.
+  // 감싸지 않으면 그 예외로 프로세스가 죽어서 HTTP 서버까지 같이 안 뜬다.
+  // HTTPS는 '다른 기기에서 카메라를 쓰기 위한 부가 기능'이므로, 실패해도 본체는 살아야 한다.
+  try {
+    httpsServer = https.createServer(
+      { key: fs.readFileSync(keyPath), cert: fs.readFileSync(certPath) },
+      app
+    );
+    io.attach(httpsServer);
+  } catch (e) {
+    httpsServer = null;
+    console.warn(
+      '[HTTPS 건너뜀] server/certs 의 인증서를 읽지 못했습니다 (' + (e.code || e.message) + ')\n' +
+      '  · 이 컴퓨터에서 http://localhost:' + PORT + ' 로 쓰는 데는 아무 문제 없습니다.\n' +
+      '  · 다른 기기에서 카메라를 쓰려면: cd server && npm run gen-cert'
+    );
+  }
 }
 
 /* ------------------------------------------------------- 정적 파일
