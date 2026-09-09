@@ -44,7 +44,32 @@ const el = {
 };
 
 const STATE_KO = { focused: '집중', distracted: '딴짓', drowsy: '졸음', away: '자리 이탈', idle: '대기' };
-const STATE_COLOR = { focused: '#5db872', distracted: '#d4a017', drowsy: '#c64545', away: '#6c6a64' };
+
+/* ------------------------------------------------ 색: CSS 변수가 유일한 출처
+ * 캔버스는 CSS를 쓸 수 없어 색 값을 직접 넣어야 한다. 그렇다고 여기에 hex를 적으면
+ * style.css 의 :root 를 바꿔도 캔버스만 옛 색으로 남아 화면 절반만 바뀐다.
+ * 그래서 :root 값을 한 번 읽어와 이 객체로만 쓴다. 색을 바꾸는 곳은 CSS 한 곳뿐. */
+const cssVar = (name, fallback = '#000000') =>
+  getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+
+/** '#rrggbb' → 'rgba(r,g,b,a)'  — 캔버스에서 투명도를 줄 때 */
+function withAlpha(hex, alpha) {
+  const h = hex.replace('#', '');
+  const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h;
+  const n = parseInt(full, 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+}
+
+const C = {
+  teal:    cssVar('--accent-teal'),
+  ink:     cssVar('--ink'),
+  muted:   cssVar('--muted'),
+  success: cssVar('--success'),
+  warning: cssVar('--warning'),
+  error:   cssVar('--error'),
+};
+
+const STATE_COLOR = { focused: C.success, distracted: C.warning, drowsy: C.error, away: C.muted };
 /* ---------------------------------------------- 화면 수치의 유일한 출처
  * 여기 있는 값만 고치면 화면 문구와 계산이 함께 따라간다.
  * 예전엔 같은 숫자가 index.html 텍스트와 이 파일에 따로 박혀 있어서,
@@ -68,9 +93,9 @@ el.battleCodeInput.maxLength = UI.roomCodeLen;
 
 if (USE_MOCK) {
   el.engineBadge.textContent = '엔진: MOCK (UI 개발용)';
-  el.engineBadge.style.color = '#d4a017';
-  el.engineBadge.style.borderColor = 'rgba(212,160,23,.4)';
-  el.engineBadge.style.background = 'rgba(212,160,23,.08)';
+  el.engineBadge.style.color = C.warning;
+  el.engineBadge.style.borderColor = withAlpha(C.warning, 0.4);
+  el.engineBadge.style.background = withAlpha(C.warning, 0.08);
 }
 
 /* ------------------------------------------------------------- 상태 */
@@ -341,7 +366,7 @@ function drawOverlay(landmarks) {
   const ctx = c.getContext('2d');
   ctx.clearRect(0, 0, w, h);
   if (!landmarks) return;
-  ctx.fillStyle = 'rgba(93,184,166,.75)';
+  ctx.fillStyle = withAlpha(C.teal, 0.75);
   for (let i = 0; i < landmarks.length; i += 4) {
     const p = landmarks[i];
     ctx.fillRect(p.x * w - 1, p.y * h - 1, 2, 2);
@@ -362,14 +387,14 @@ function drawMini() {
   const Y = (s) => h - 6 - (s / 100) * (h - 12);
 
   // 기준선 (집중 임계선 — 엔진과 같은 값을 쓴다)
-  ctx.strokeStyle = 'rgba(20,20,19,.12)';
+  ctx.strokeStyle = withAlpha(C.ink, 0.12);
   ctx.setLineDash([3, 4]); ctx.beginPath();
   ctx.moveTo(0, Y(THRESHOLDS.focused)); ctx.lineTo(w, Y(THRESHOLDS.focused)); ctx.stroke(); ctx.setLineDash([]);
 
   // 면적
   const grad = ctx.createLinearGradient(0, 0, 0, h);
-  grad.addColorStop(0, 'rgba(93,184,166,.28)');
-  grad.addColorStop(1, 'rgba(93,184,166,0)');
+  grad.addColorStop(0, withAlpha(C.teal, 0.28));
+  grad.addColorStop(1, withAlpha(C.teal, 0));
   ctx.beginPath();
   ctx.moveTo(X(recent[0].t), h);
   for (const r of recent) ctx.lineTo(X(r.t), Y(r.score));
@@ -379,10 +404,10 @@ function drawMini() {
   // 선
   ctx.beginPath();
   recent.forEach((r, i) => (i ? ctx.lineTo(X(r.t), Y(r.score)) : ctx.moveTo(X(r.t), Y(r.score))));
-  ctx.strokeStyle = '#5db8a6'; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.stroke();
+  ctx.strokeStyle = C.teal; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.stroke();
 
   // 막힌 지점 마커
-  ctx.fillStyle = '#141413';
+  ctx.fillStyle = C.ink;
   for (const t of recentConf) {
     ctx.beginPath(); ctx.arc(X(t), 8, 3, 0, Math.PI * 2); ctx.fill();
   }
@@ -456,7 +481,7 @@ function drawReportChart(rep) {
   ctx.clearRect(0, 0, w, h);
   const tl = rep.timeline;
   if (tl.length < 2) {
-    ctx.fillStyle = '#6c6a64'; ctx.font = '13px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillStyle = C.muted; ctx.font = '13px sans-serif'; ctx.textAlign = 'center';
     ctx.fillText('데이터가 너무 짧습니다', w / 2, h / 2);
     return;
   }
@@ -467,13 +492,13 @@ function drawReportChart(rep) {
 
   // 흐트러진 구간 배경 밴드
   for (const s of rep.segments) {
-    ctx.fillStyle = STATE_COLOR[s.type] + '22';
+    ctx.fillStyle = withAlpha(STATE_COLOR[s.type], 0.13);
     ctx.fillRect(X(s.startT), pad.t, Math.max(2, X(s.endT) - X(s.startT)), h - pad.t - pad.b);
   }
 
   // 격자 + y축
-  ctx.strokeStyle = 'rgba(20,20,19,.08)'; ctx.lineWidth = 1;
-  ctx.fillStyle = '#6c6a64'; ctx.font = '11px sans-serif'; ctx.textAlign = 'right';
+  ctx.strokeStyle = withAlpha(C.ink, 0.08); ctx.lineWidth = 1;
+  ctx.fillStyle = C.muted; ctx.font = '11px sans-serif'; ctx.textAlign = 'right';
   for (const v of [0, 25, 50, 75, 100]) {
     ctx.beginPath(); ctx.moveTo(pad.l, Y(v)); ctx.lineTo(w - pad.r, Y(v)); ctx.stroke();
     ctx.fillText(String(v), pad.l - 6, Y(v) + 4);
@@ -488,8 +513,8 @@ function drawReportChart(rep) {
 
   // 곡선
   const grad = ctx.createLinearGradient(0, pad.t, 0, h - pad.b);
-  grad.addColorStop(0, 'rgba(93,184,166,.28)');
-  grad.addColorStop(1, 'rgba(93,184,166,0)');
+  grad.addColorStop(0, withAlpha(C.teal, 0.28));
+  grad.addColorStop(1, withAlpha(C.teal, 0));
   ctx.beginPath();
   ctx.moveTo(X(tl[0].t), h - pad.b);
   for (const p of tl) ctx.lineTo(X(p.t), Y(p.score));
@@ -498,15 +523,15 @@ function drawReportChart(rep) {
 
   ctx.beginPath();
   tl.forEach((p, i) => (i ? ctx.lineTo(X(p.t), Y(p.score)) : ctx.moveTo(X(p.t), Y(p.score))));
-  ctx.strokeStyle = '#5db8a6'; ctx.lineWidth = 2.2; ctx.lineJoin = 'round'; ctx.stroke();
+  ctx.strokeStyle = C.teal; ctx.lineWidth = 2.2; ctx.lineJoin = 'round'; ctx.stroke();
 
   // 막힌 지점 마커
   for (const e of rep.events) {
-    ctx.strokeStyle = 'rgba(20,20,19,.35)'; ctx.lineWidth = 1;
+    ctx.strokeStyle = withAlpha(C.ink, 0.35); ctx.lineWidth = 1;
     ctx.setLineDash([2, 3]);
     ctx.beginPath(); ctx.moveTo(X(e.t), pad.t); ctx.lineTo(X(e.t), h - pad.b); ctx.stroke();
     ctx.setLineDash([]);
-    ctx.fillStyle = '#141413';
+    ctx.fillStyle = C.ink;
     ctx.beginPath(); ctx.arc(X(e.t), pad.t + 2, 4, 0, Math.PI * 2); ctx.fill();
   }
 }
