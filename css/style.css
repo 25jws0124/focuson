@@ -26,6 +26,12 @@
   --font-body:"Inter","Pretendard","Apple SD Gothic Neo","Noto Sans KR",system-ui,-apple-system,"Segoe UI",sans-serif;
 }
 *{box-sizing:border-box}
+
+/* hidden 속성이 항상 이기게 한다.
+ * .parentreport{display:flex} 처럼 요소에 display가 지정돼 있으면
+ * 브라우저 기본 [hidden]{display:none} 을 이겨서 숨김이 안 먹는다.
+ * (이 때문에 .camoverlay[hidden] / .calibring[hidden] 을 개별 땜질해 왔다.) */
+[hidden]{display:none!important}
 html,body{margin:0;padding:0}
 body{
   background:var(--canvas);
