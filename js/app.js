@@ -65,7 +65,11 @@ let lastReport = null;
  *   2) 서버단 기능 UI는 기본적으로 숨기고, 실제로 연결될 때만 노출한다.
  *      눌러도 아무 일도 안 일어나는 버튼을 보여주지 않기 위함. */
 const NOOP_SOCKET = { on() {}, emit() {} };
-const socket = (typeof io === 'function') ? io() : NOOP_SOCKET;
+// 재시도를 3회로 제한한다. 기본값은 무한 재시도라, 백엔드가 없는 정적 배포에서
+// /socket.io/ 404 요청을 세션 내내 5초마다 계속 보낸다(요청 수백 건 낭비 + 콘솔 오염).
+const socket = (typeof io === 'function')
+  ? io({ reconnectionAttempts: 3, timeout: 4000 })
+  : NOOP_SOCKET;
 let battleActive = false;
 
 // 기본값: 백엔드 없음으로 가정 → 숨김 (연결되면 아래에서 다시 켜짐)
@@ -73,6 +77,8 @@ el.battle.hidden = true;
 el.parentReportBox.hidden = true;
 
 socket.on('connect', () => {
+  // 한 번이라도 붙었으면 진짜 백엔드가 있는 것 → 이후 끊김은 무한 재시도로 복구한다.
+  socket.io.reconnectionAttempts(Infinity);
   el.battle.hidden = false;
   el.parentReportBox.hidden = false;
 });
