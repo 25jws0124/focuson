@@ -61,7 +61,12 @@ app.use(express.json());
 app.post('/api/parent-report/send', (req, res) => {
   const { parentEmail, summary } = req.body || {};
 
-  console.log('[모의 발송] ' + parentEmail + '에게 보낼 리포트: ' + JSON.stringify(summary));
+  // 사용자 입력(이메일 주소, 리포트 내용)은 로그에 남기지 않는다.
+  // 호스팅 서비스의 로그는 우리가 통제하지 못하는 곳에 보관된다.
+  // 발송 여부를 추적하는 데 필요한 것은 "요청이 왔다"는 사실뿐이다.
+  // 실제 이메일 연동 시에도 이 원칙은 같다 —
+  // 외부 서비스의 오류 봉투(status/message)만 남기고 수신자·본문은 남기지 않는다.
+  console.log('[모의 발송] 학부모 리포트 요청 1건 처리 (수신자·내용은 기록하지 않음)');
 
   res.json({
     ok: true,
